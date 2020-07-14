@@ -14,7 +14,9 @@ public struct Signature: UIViewRepresentable {
     private let color: UIColor
 
     public func updateUIView(_ uiView: SignatureDrawingView, context: Context) {
-        return
+        if uiView.partialSignatureImage != image {
+            uiView.setImage(image: self.image)
+        }
     }
 
     public func makeUIView(context: Context) -> SignatureDrawingView {
@@ -41,11 +43,11 @@ public struct Signature: UIViewRepresentable {
 
 @available(iOS 13.0, *)
 public class SignatureDelegate: SignatureDrawingViewDelegate {
-    @Binding var image: UIImage?
-
-    public func signatureDrawingViewDidChange(view: SignatureDrawingView) {
-        self.image = view.fullSignatureImage
+    public func signatureDrawingViewDidChange(view: UIImage?) {
+        self.image = view
     }
+
+    @Binding var image: UIImage?
 
     init(image: Binding<UIImage?>) {
         self._image = image

@@ -1,16 +1,16 @@
 /**
  Copyright (c) 2017 Uber Technologies, Inc.
- 
+
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
  in the Software without restriction, including without limitation the rights
  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
- 
+
  The above copyright notice and this permission notice shall be included in
  all copies or substantial portions of the Software.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -23,21 +23,19 @@
 import UIKit
 
 public protocol SignatureDrawingViewDelegate: class {
-    func signatureDrawingViewDidChange(view: SignatureDrawingView)
+    func signatureDrawingViewDidChange(view: UIImage?)
 }
 
 /**
  A view controller that allows the user to draw a signature and provides additional functionality.
  */
 public class SignatureDrawingView: UIView {
-   
+
     /**
      Initializer
      - parameter image: An optional starting image for the signature.
      */
     public init(frame: CGRect, image: UIImage? = nil) {
-        self.presetImage = image
-
         super.init(frame: frame)
 
         self.backgroundColor = UIColor.clear
@@ -60,15 +58,26 @@ public class SignatureDrawingView: UIView {
             self.layoutIfNeeded()
             model.addImageToSignature(image)
             updateViewFromModel()
-            self.presetImage = nil
         }
+    }
+
+    func setImage(image: UIImage?) {
+        model.reset()
+
+        self.layoutIfNeeded()
+
+        if let image = image {
+            model.addImageToSignature(image)
+        }
+
+        updateViewFromModel()
     }
 
     /// Use init(image:) instead.
     public required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     /// Returns an image of the signature (with a transparent background).
     public var fullSignatureImage: UIImage? {
         if self.bezierPathLayer.path == nil && self.imageView.image == nil {
@@ -76,7 +85,11 @@ public class SignatureDrawingView: UIView {
         }
         return model.fullSignatureImage
     }
-    
+
+    var partialSignatureImage: UIImage? {
+        return self.imageView.image
+    }
+
     /**
      The color of the signature.
      Defaults to black.
@@ -94,59 +107,58 @@ public class SignatureDrawingView: UIView {
 
     /// Delegate for callbacks.
     public weak var delegate: SignatureDrawingViewDelegate?
-    
+
     /// Resets the signature.
     public func reset() {
         model.reset()
         updateViewFromModel()
     }
-    
+
     override public func layoutSubviews() {
         super.layoutSubviews()
-        
+
         model.imageSize = self.bounds.size
         updateViewFromModel()
     }
-    
+
     // MARK: UIResponder
-    
+
     override public func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
         updateModel(withTouches: touches, shouldEndContinousLine: true)
     }
-    
+
     override public func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesMoved(touches, with: event)
         updateModel(withTouches: touches, shouldEndContinousLine: false)
     }
-    
+
     // MARK: Private
-    
+
     private let model = SignatureDrawingModelAsync()
-    
+
     private lazy var bezierPathLayer: CAShapeLayer = {
         let layer = CAShapeLayer()
         layer.strokeColor = signatureColor.cgColor
         layer.fillColor = signatureColor.cgColor
-        
+
         return layer
     }()
 
     private var imageView = UIImageView()
-    private var presetImage: UIImage?
-    
+
     private func updateModel(withTouches touches: Set<UITouch>, shouldEndContinousLine: Bool) {
         guard let touchPoint = touches.touchPoint else {
             return
         }
-        
+
         if shouldEndContinousLine {
             model.asyncEndContinuousLine()
         }
         model.asyncUpdate(withPoint: touchPoint)
         updateViewFromModel()
     }
-    
+
     private func updateViewFromModel() {
         model.asyncGetOutput { (output) in
             if self.imageView.image != output.signatureImage {
@@ -156,7 +168,7 @@ public class SignatureDrawingView: UIView {
                 self.bezierPathLayer.path = output.temporarySignatureBezierPath?.cgPath
             }
 
-            self.delegate?.signatureDrawingViewDidChange(view: self)
+            self.delegate?.signatureDrawingViewDidChange(view: output.signatureImage)
         }
     }
 }
