@@ -22,24 +22,48 @@
 
 import UIKit
 
-public protocol SignatureDrawingViewControllerDelegate: class {
-    /// Callback when isEmpty changes, due to user drawing or reset() being called.
-    func signatureDrawingViewControllerIsEmptyDidChange(controller: SignatureDrawingViewController, isEmpty: Bool)
+public protocol SignatureDrawingViewDelegate: class {
+    func signatureDrawingViewDidChange(view: SignatureDrawingView)
 }
 
 /**
  A view controller that allows the user to draw a signature and provides additional functionality.
  */
-public class SignatureDrawingViewController: UIViewController {
+public class SignatureDrawingView: UIView {
    
     /**
      Initializer
      - parameter image: An optional starting image for the signature.
      */
-    public init(image: UIImage? = nil) {
-        super.init(nibName: nil, bundle: nil)
+    public init(frame: CGRect, image: UIImage? = nil) {
+        self.presetImage = image
+
+        super.init(frame: frame)
+
+        self.backgroundColor = UIColor.clear
+        self.addSubview(imageView)
+
+        self.layer.addSublayer(bezierPathLayer)
+        self.layer.masksToBounds = true
+
+        // Constraints
+
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        self.addConstraints([
+            NSLayoutConstraint.init(item: imageView, attribute: .top, relatedBy: .equal, toItem: self, attribute: .top, multiplier: 1, constant: 0),
+            NSLayoutConstraint.init(item: imageView, attribute: .bottom, relatedBy: .equal, toItem: self, attribute: .bottom, multiplier: 1, constant: 0),
+            NSLayoutConstraint.init(item: imageView, attribute: .left, relatedBy: .equal, toItem: self, attribute: .left, multiplier: 1, constant: 0),
+            NSLayoutConstraint.init(item: imageView, attribute: .right, relatedBy: .equal, toItem: self, attribute: .right, multiplier: 1, constant: 0),
+            ])
+
+        if let image = image {
+            self.layoutIfNeeded()
+            model.addImageToSignature(image)
+            updateViewFromModel()
+            self.presetImage = nil
+        }
     }
-    
+
     /// Use init(image:) instead.
     public required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
@@ -47,6 +71,9 @@ public class SignatureDrawingViewController: UIViewController {
     
     /// Returns an image of the signature (with a transparent background).
     public var fullSignatureImage: UIImage? {
+        if self.bezierPathLayer.path == nil && self.imageView.image == nil {
+            return nil
+        }
         return model.fullSignatureImage
     }
     
@@ -64,22 +91,9 @@ public class SignatureDrawingViewController: UIViewController {
             bezierPathLayer.fillColor = color.cgColor
         }
     }
-    
-    /**
-     Whether the signature drawing is empty or not.
-     This changes when the user draws or the view is reset.
-     - note: Defaults to false if there's a starting image.
-     */
-    private(set) var isEmpty = true {
-        didSet {
-            if isEmpty != oldValue {
-                delegate?.signatureDrawingViewControllerIsEmptyDidChange(controller: self, isEmpty: isEmpty)
-            }
-        }
-    }
-    
+
     /// Delegate for callbacks.
-    public weak var delegate: SignatureDrawingViewControllerDelegate?
+    public weak var delegate: SignatureDrawingViewDelegate?
     
     /// Resets the signature.
     public func reset() {
@@ -87,42 +101,10 @@ public class SignatureDrawingViewController: UIViewController {
         updateViewFromModel()
     }
     
-    // MARK: UIViewController
-    
-    override public func viewDidLoad() {
-        super.viewDidLoad()
+    override public func layoutSubviews() {
+        super.layoutSubviews()
         
-        view.backgroundColor = UIColor.clear
-        view.addSubview(imageView)
-        
-        view.layer.addSublayer(bezierPathLayer)
-        
-        // Constraints
-        
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        view.addConstraints([
-            NSLayoutConstraint.init(item: imageView, attribute: .top, relatedBy: .equal, toItem: view, attribute: .top, multiplier: 1, constant: 0),
-            NSLayoutConstraint.init(item: imageView, attribute: .bottom, relatedBy: .equal, toItem: view, attribute: .bottom, multiplier: 1, constant: 0),
-            NSLayoutConstraint.init(item: imageView, attribute: .left, relatedBy: .equal, toItem: view, attribute: .left, multiplier: 1, constant: 0),
-            NSLayoutConstraint.init(item: imageView, attribute: .right, relatedBy: .equal, toItem: view, attribute: .right, multiplier: 1, constant: 0),
-            ])
-    }
-    
-    override public func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        
-        if let image = presetImage {
-            view.layoutIfNeeded()
-            model.addImageToSignature(image)
-            updateViewFromModel()
-            presetImage = nil
-        }
-    }
-    
-    override public func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        
-        model.imageSize = view.bounds.size
+        model.imageSize = self.bounds.size
         updateViewFromModel()
     }
     
@@ -173,8 +155,8 @@ public class SignatureDrawingViewController: UIViewController {
             if self.bezierPathLayer.path != output.temporarySignatureBezierPath?.cgPath {
                 self.bezierPathLayer.path = output.temporarySignatureBezierPath?.cgPath
             }
-            
-            self.isEmpty = self.bezierPathLayer.path == nil && self.imageView.image == nil
+
+            self.delegate?.signatureDrawingViewDidChange(view: self)
         }
     }
 }
@@ -182,7 +164,6 @@ public class SignatureDrawingViewController: UIViewController {
 extension Set where Element == UITouch {
     var touchPoint: CGPoint? {
         let touch = first
-        
         return touch?.location(in: touch?.view)
     }
 }
