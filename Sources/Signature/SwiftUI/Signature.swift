@@ -8,6 +8,7 @@
 
 import SwiftUI
 
+@available(iOS 13.0, *)
 public struct Signature: UIViewRepresentable {
     @Binding var image: UIImage?
     private let color: UIColor
@@ -38,6 +39,7 @@ public struct Signature: UIViewRepresentable {
     }
 }
 
+@available(iOS 13.0, *)
 public class SignatureDelegate: SignatureDrawingViewDelegate {
     @Binding var image: UIImage?
 
